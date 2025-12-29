@@ -14,7 +14,7 @@ def ranking_neighborhoods():
     densities = []
 
     for dog_row, n_row in zip(dogs.itertuples(), neighborhoods.itertuples()):
-        density = dog_row.dogsByNeighborhood / n_row.Shape_Area
+        density = dog_row.dogsByNeighborhood / n_row.neighborhoodSize
         densities.append(density)
 
     neighborhoods["density"] = densities
