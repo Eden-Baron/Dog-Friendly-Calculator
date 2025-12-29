@@ -1,17 +1,12 @@
 import pandas as pd
 import requests
-
-
-def calculate_center(rings):
-    x_coords = [pt[0] for ring in rings for pt in ring]
-    y_coords = [pt[1] for ring in rings for pt in ring]
-    return [sum(x_coords) / len(x_coords), sum(y_coords) / len(y_coords)]
+from shapely.geometry import Polygon
+from shapely.wkt import dumps as wkt_dumps
 
 
 def create_neighborhoods():
     url = "https://gisn.tel-aviv.gov.il/arcgis/rest/services/IView2/MapServer/511/query?where=1%3D1&outFields=*&f=json"
-    response = requests.get(url)
-    data = response.json()
+    data =  requests.get(url).json()
     features = data["features"]
 
     neighborhoods = []
@@ -20,20 +15,18 @@ def create_neighborhoods():
         geometry = f.get("geometry", {})
         rings = geometry.get("rings", [])
 
-        if not rings:
-            continue
-
-        center = calculate_center(rings)
+        polygon = Polygon(rings[0]) 
+        polygon = polygon.simplify(3) 
 
         neighborhoods.append(
             {
                 "neighborhoodName": attributes.get("shem_shchuna"),
-                "Shape_Area": attributes.get("Shape_Area"),
-                "x_center": center[0],
-                "y_center": center[1],
+                "neighborhoodSize": attributes.get("Shape_Area"),
+                "geometry": wkt_dumps(polygon) 
             }
         )
 
     df = pd.DataFrame(neighborhoods).sort_values(by="neighborhoodName")
     df.to_csv("data/neighborhoods.csv", index=False, encoding="utf-8-sig")
     return df
+
