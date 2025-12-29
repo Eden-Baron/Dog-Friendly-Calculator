@@ -1,5 +1,7 @@
 import requests
 import pandas as pd
+from shapely.geometry import Polygon
+from shapely.wkt import dumps as wkt_dumps
 
 
 def create_parks():
@@ -9,31 +11,44 @@ def create_parks():
     features = data["features"]
 
     parks = []
+
     for f in features:
         attributes = f["attributes"]
         geometry = f.get("geometry", {})
+        rings = geometry.get("rings")
+        
+        if not rings:
+            continue
 
-        if "rings" in geometry and geometry["rings"]:
-            all_points = [p for ring in geometry["rings"] for p in ring]
-            x_center = sum(p[0] for p in all_points) / len(all_points)
-            y_center = sum(p[1] for p in all_points) / len(all_points)
-        else:
-            x_center, y_center = None, None
+        polygon = Polygon(rings[0])
 
+        polygon = polygon.simplify(3)
+
+        geom_wkt = wkt_dumps(polygon)
+
+        # סינון לפי גודל פארק
         if attributes.get("ms_area", 0) > 10000:
             parks.append(
                 {
                     "park_name": attributes.get("shem_gan"),
                     "park_size": attributes.get("ms_area"),
-                    "x_center": x_center,
-                    "y_center": y_center,
+                    "geometry": geom_wkt,
                 }
             )
 
     df = pd.DataFrame(parks)
+
+    # מיזוג פארקים בעלי אותו שם
     df = (
         df.groupby("park_name")
-        .agg({"park_size": "sum", "x_center": "mean", "y_center": "mean"})
+        .agg(
+            {
+                "park_size": "sum",
+                "geometry": "first",
+            }
+        )
         .reset_index()
     )
+
     df.to_csv("data/parks.csv", encoding="utf-8-sig", index=False)
+
